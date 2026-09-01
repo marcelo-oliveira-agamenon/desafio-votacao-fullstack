@@ -1,86 +1,126 @@
 # Votação
 
-## Objetivo
+API REST + front-end para gerenciar pautas e sessões de votação de
+assembleias: cadastrar pautas, abrir sessões por tempo determinado,
+receber votos `SIM`/`NAO` (um por associado) e apurar o resultado.
 
-No cooperativismo, cada associado possui um voto e as decisões são tomadas em assembleias, por votação. Imagine que você deve criar uma solução we para gerenciar e participar dessas sessões de votação.
-Essa solução deve ser executada na nuvem e promover as seguintes funcionalidades através de uma API REST / Front:
+O enunciado original está em [CHALLENGE.md](CHALLENGE.md).
 
-- Cadastrar uma nova pauta
-- Abrir uma sessão de votação em uma pauta (a sessão de votação deve ficar aberta por
-  um tempo determinado na chamada de abertura ou 1 minuto por default)
-- Receber votos dos associados em pautas (os votos são apenas 'Sim'/'Não'. Cada associado
-  é identificado por um id único e pode votar apenas uma vez por pauta)
-- Contabilizar os votos e dar o resultado da votação na pauta
+## Stack
 
-Para fins de exercício, a segurança das interfaces pode ser abstraída e qualquer chamada para as interfaces pode ser considerada como autorizada. A solução deve ser construída em java com Spring-boot e Angular/React conforme orientação, mas os frameworks e bibliotecas são de livre escolha (desde que não infrinja direitos de uso).
+- **Backend**: Java 21, Spring Boot 4, Spring Data JPA, Flyway, PostgreSQL
+- **Frontend**: React 19, Vite, TypeScript, Tailwind CSS
+- **Testes**: JUnit 5, Mockito, Testcontainers
+- **Carga**: k6
 
-É importante que as pautas e os votos sejam persistidos e que não sejam perdidos com o restart da aplicação.
+## Como executar
 
-## Como proceder
+Pré-requisitos: JDK 21, Docker (para o banco e os testes de integração),
+Node 20+.
 
-Por favor, realize o FORK desse repositório e implemente sua solução no FORK em seu repositório GItHub, ao final, notifique da conclusão para que possamos analisar o código implementado.
+### 1. Banco de dados
 
-Lembre de deixar todas as orientações necessárias para executar o seu código.
-
-### Tarefas bônus
-
-- Tarefa Bônus 1 - Integração com sistemas externos
-  - Criar uma Facade/Client Fake que retorna aleátoriamente se um CPF recebido é válido ou não.
-  - Caso o CPF seja inválido, a API retornará o HTTP Status 404 (Not found). Você pode usar geradores de CPF para gerar CPFs válidos
-  - Caso o CPF seja válido, a API retornará se o usuário pode (ABLE_TO_VOTE) ou não pode (UNABLE_TO_VOTE) executar a operação. Essa operação retorna resultados aleatórios, portanto um mesmo CPF pode funcionar em um teste e não funcionar no outro.
-
-```
-// CPF Ok para votar
-{
-    "status": "ABLE_TO_VOTE
-}
-// CPF Nao Ok para votar - retornar 404 no client tb
-{
-    "status": "UNABLE_TO_VOTE
-}
+```bash
+docker compose up -d db
 ```
 
-Exemplos de retorno do serviço
+Sobe um PostgreSQL 16 em `localhost:5432` (`votacao`/`votacao`/`votacao`)
+com volume nomeado — os dados sobrevivem a `restart` e `down`.
 
-### Tarefa Bônus 2 - Performance
+### 2. Backend
 
-- Imagine que sua aplicação possa ser usada em cenários que existam centenas de
-  milhares de votos. Ela deve se comportar de maneira performática nesses
-  cenários
-- Testes de performance são uma boa maneira de garantir e observar como sua
-  aplicação se comporta
+```bash
+cd backend
+./mvnw spring-boot:run
+```
 
-### Tarefa Bônus 3 - Versionamento da API
+Disponível em `http://localhost:8080`. O Flyway cria o schema no primeiro
+start. Variáveis de ambiente (todas com default para o compose acima):
 
-○ Como você versionaria a API da sua aplicação? Que estratégia usar?
+| Var | Default | |
+| --- | --- | --- |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/votacao` | |
+| `DB_USERNAME` / `DB_PASSWORD` | `votacao` / `votacao` | |
+| `SERVER_PORT` | `8080` | |
+| `ELEGIBILIDADE_PROB_CPF_INVALIDO` | `0.2` | chance de o client fake tratar o CPF como não encontrado (Bônus 1) |
+| `ELEGIBILIDADE_PROB_INELEGIVEL` | `0.2` | chance de `UNABLE_TO_VOTE` |
 
-## O que será analisado
+> Para testar o fluxo sem 404 aleatórios, suba com as duas probabilidades em `0`.
 
-- Simplicidade no design da solução (evitar over engineering)
-- Organização do código
-- Arquitetura do projeto
-- Boas práticas de programação (manutenibilidade, legibilidade etc)
-- Possíveis bugs
-- Tratamento de erros e exceções
-- Explicação breve do porquê das escolhas tomadas durante o desenvolvimento da solução
-- Uso de testes automatizados e ferramentas de qualidade
-- Limpeza do código
-- Documentação do código e da API
-- Logs da aplicação
-- Mensagens e organização dos commits
-- Testes
-- Layout responsivo
+### 3. Frontend
 
-## Dicas
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-- Teste bem sua solução, evite bugs
+Disponível em `http://localhost:5173`; o dev server faz proxy de `/api`
+para `http://localhost:8080` (ajuste com `VITE_API_TARGET`).
 
-  Observações importantes
-- Não inicie o teste sem sanar todas as dúvidas
-- Iremos executar a aplicação para testá-la, cuide com qualquer dependência externa e
-  deixe claro caso haja instruções especiais para execução do mesmo
-  Classificação da informação: Uso Interno
+### Testes
 
+```bash
+cd backend
+./mvnw test
+```
 
+Testes unitários e de web slice não precisam de infra; o teste de
+integração ([`VotacaoIntegrationTest`](backend/src/test/java/com/desafio/votacao/VotacaoIntegrationTest.java))
+sobe um PostgreSQL via Testcontainers e **requer Docker**.
 
-# desafio-votacao
+### Teste de carga (Bônus 2)
+
+Ver [perf/README.md](perf/README.md).
+
+## API
+
+Base: `/api/v1`. Referência com exemplos em [docs/API.md](docs/API.md);
+arquivo pronto para o REST Client em [backend/requests.http](backend/requests.http).
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `POST` | `/pautas` | Cadastra uma pauta |
+| `GET` | `/pautas` | Lista as pautas |
+| `POST` | `/pautas/{id}/sessao` | Abre a sessão (corpo opcional; default 1 min) |
+| `GET` | `/pautas/{id}/sessao` | Consulta a sessão |
+| `POST` | `/pautas/{id}/votos` | Registra um voto (`SIM`/`NAO`) |
+| `GET` | `/pautas/{id}/resultado` | Apura o resultado |
+
+## Decisões de projeto
+
+- **Arquitetura em camadas simples**: `web` (controllers + DTOs),
+  `service` (regra de negócio, transações), `repository` (Spring Data),
+  `domain` (entidades). Sem módulos nem abstrações que o tamanho do
+  problema não pede.
+- **Persistência**: PostgreSQL + Flyway. As regras que não podem ser
+  violadas nem sob concorrência ficam no banco: `sessao_votacao.pauta_id`
+  único (uma sessão por pauta) e `unique (sessao_id, associado_id)` (um
+  voto por associado). O `VotoService` ainda traduz a violação de
+  unicidade em `409` para o caso de corrida.
+- **Sessão sem job de fechamento**: a sessão guarda `abertura` e
+  `encerramento`; estar aberta é `agora ∈ [abertura, encerramento)`,
+  calculado na leitura. Menos peças móveis, nada de scheduler para manter.
+- **Apuração no banco**: `count` por escolha em vez de carregar votos;
+  escala para o cenário do Bônus 2.
+- **Elegibilidade (Bônus 1)**: `AssociadoElegibilidadeClient` com
+  implementação fake atrás da interface. CPF malformado ou "não
+  encontrado" e `UNABLE_TO_VOTE` viram `404`. As probabilidades são
+  configuráveis para não travar avaliação manual.
+- **Erros**: um único `@RestControllerAdvice` converte exceções em um
+  corpo `ApiError` consistente (`404`/`409`/`400`/`500`).
+- **Versionamento (Bônus 3)**: prefixo `/api/v1`; racional completo em
+  [docs/versionamento-api.md](docs/versionamento-api.md).
+- **Logs**: SLF4J nos serviços, `INFO` nas operações de escrita (pauta
+  criada, sessão aberta, voto registrado, elegibilidade consultada) e
+  `ERROR` com stack trace no handler de erro inesperado.
+
+## Estrutura
+
+```
+backend/    API Spring Boot (Maven wrapper incluso)
+frontend/   SPA React + Vite
+perf/       teste de carga k6 (Bônus 2)
+docs/       referência da API e estratégia de versionamento
+docker-compose.yml   PostgreSQL
+```

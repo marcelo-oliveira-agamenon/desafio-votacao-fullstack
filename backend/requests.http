@@ -1,0 +1,32 @@
+### Cadastrar pauta
+POST http://localhost:8080/api/v1/pautas
+Content-Type: application/json
+
+{ "titulo": "Reforma do estatuto", "descricao": "Votação da nova redação" }
+
+### Listar pautas
+GET http://localhost:8080/api/v1/pautas
+
+### Abrir sessão (5 minutos)
+POST http://localhost:8080/api/v1/pautas/1/sessao
+Content-Type: application/json
+
+{ "duracaoSegundos": 300 }
+
+### Consultar sessão
+GET http://localhost:8080/api/v1/pautas/1/sessao
+
+### Votar SIM
+POST http://localhost:8080/api/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "111.444.777-35", "escolha": "SIM" }
+
+### Votar NAO
+POST http://localhost:8080/api/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "529.982.247-25", "escolha": "NAO" }
+
+### Apurar resultado
+GET http://localhost:8080/api/v1/pautas/1/resultado
