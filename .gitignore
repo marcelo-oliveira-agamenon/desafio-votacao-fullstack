@@ -1,0 +1,12 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Node (frontend)
+node_modules/
+dist/
+
+# Java (backend)
+target/
