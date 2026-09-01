@@ -3,8 +3,11 @@ package com.desafio.votacao.service;
 import com.desafio.votacao.domain.EscolhaVoto;
 import com.desafio.votacao.domain.SessaoVotacao;
 import com.desafio.votacao.domain.Voto;
+import com.desafio.votacao.exception.AssociadoNaoHabilitadoException;
 import com.desafio.votacao.exception.RecursoNaoEncontradoException;
 import com.desafio.votacao.exception.RegraDeNegocioException;
+import com.desafio.votacao.integration.elegibilidade.AssociadoElegibilidadeClient;
+import com.desafio.votacao.integration.elegibilidade.StatusElegibilidade;
 import com.desafio.votacao.repository.SessaoVotacaoRepository;
 import com.desafio.votacao.repository.VotoRepository;
 import java.time.Instant;
@@ -21,14 +24,24 @@ public class VotoService {
 
     private final VotoRepository votoRepository;
     private final SessaoVotacaoRepository sessaoRepository;
+    private final AssociadoElegibilidadeClient elegibilidadeClient;
 
-    public VotoService(VotoRepository votoRepository, SessaoVotacaoRepository sessaoRepository) {
+    public VotoService(
+        VotoRepository votoRepository,
+        SessaoVotacaoRepository sessaoRepository,
+        AssociadoElegibilidadeClient elegibilidadeClient
+    ) {
         this.votoRepository = votoRepository;
         this.sessaoRepository = sessaoRepository;
+        this.elegibilidadeClient = elegibilidadeClient;
     }
 
     @Transactional
     public Voto registrar(Long pautaId, String associadoId, EscolhaVoto escolha) {
+        if (elegibilidadeClient.consultar(associadoId).status() == StatusElegibilidade.UNABLE_TO_VOTE) {
+            throw new AssociadoNaoHabilitadoException(associadoId);
+        }
+
         SessaoVotacao sessao = sessaoRepository.findByPautaId(pautaId)
             .orElseThrow(() -> new RecursoNaoEncontradoException("A pauta " + pautaId + " não possui sessão de votação"));
 

@@ -17,6 +17,12 @@ spring:
   flyway:
     enabled: true
 
+votacao:
+  elegibilidade:
+    # client fake da Tarefa Bônus 1; use 0 para desativar o sorteio
+    probabilidade-cpf-invalido: ${ELEGIBILIDADE_PROB_CPF_INVALIDO:0.2}
+    probabilidade-inelegivel: ${ELEGIBILIDADE_PROB_INELEGIVEL:0.2}
+
 server:
   port: ${SERVER_PORT:8080}
 
